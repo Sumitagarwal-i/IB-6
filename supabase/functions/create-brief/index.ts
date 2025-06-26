@@ -1,6 +1,3 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -20,7 +17,7 @@ interface NewsItem {
   publishedAt: string
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -177,7 +174,7 @@ Format as JSON with keys: summary, pitchAngle, subjectLine, whatNotToPitch, sign
       }
     }
 
-    // 6. Save to database
+    // 6. Save to database with correct column names
     const { data, error } = await supabaseClient
       .from('briefs')
       .insert({
@@ -198,7 +195,7 @@ Format as JSON with keys: summary, pitchAngle, subjectLine, whatNotToPitch, sign
     if (error) {
       console.error('Database error:', error)
       return new Response(
-        JSON.stringify({ error: 'Failed to save brief to database' }),
+        JSON.stringify({ error: 'Failed to save brief to database', details: error.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -211,7 +208,7 @@ Format as JSON with keys: summary, pitchAngle, subjectLine, whatNotToPitch, sign
   } catch (error) {
     console.error('Error creating brief:', error)
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ error: 'Internal server error', details: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
@@ -250,3 +247,6 @@ function inferTechStack(companyName: string, website?: string, jobSignals: strin
   
   return techStack.slice(0, 6) // Limit to 6 items
 }
+
+// Import Supabase client
+import { createClient } from 'npm:@supabase/supabase-js@2'

@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Brain, Plus, History, ArrowLeft } from 'lucide-react'
+import { Brain, Plus, History, ArrowLeft, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { BriefForm } from '../components/BriefForm'
 import { AnalyzingScreen } from '../components/AnalyzingScreen'
 import { BriefCard } from '../components/BriefCard'
+import { BriefModal } from '../components/BriefModal'
 import { EmptyState } from '../components/EmptyState'
-import { supabase, Brief, CreateBriefRequest } from '../lib/supabase'
+import { supabase, Brief, CreateBriefRequest, briefsService } from '../lib/supabase'
 
 export function App() {
   const [briefs, setBriefs] = useState<Brief[]>([])
+  const [selectedBrief, setSelectedBrief] = useState<Brief | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [currentAnalysis, setCurrentAnalysis] = useState<{ companyName: string; website?: string } | null>(null)
@@ -22,13 +25,8 @@ export function App() {
 
   const loadBriefs = async () => {
     try {
-      const { data, error } = await supabase
-        .from('briefs')
-        .select('*')
-        .order('createdAt', { ascending: false })
-
-      if (error) throw error
-      setBriefs(data || [])
+      const data = await briefsService.getAll()
+      setBriefs(data)
     } catch (err) {
       console.error('Error loading briefs:', err)
       setError('Failed to load briefs')
@@ -52,7 +50,8 @@ export function App() {
       })
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
       }
 
       const result = await response.json()
@@ -67,7 +66,7 @@ export function App() {
 
     } catch (err) {
       console.error('Error creating brief:', err)
-      setError('Failed to create brief. Please try again.')
+      setError(err instanceof Error ? err.message : 'Failed to create brief. Please try again.')
       setIsAnalyzing(false)
       setCurrentAnalysis(null)
     } finally {
@@ -85,17 +84,30 @@ export function App() {
     setError(null)
   }
 
+  const handleViewBrief = (brief: Brief) => {
+    setSelectedBrief(brief)
+    setIsModalOpen(true)
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setSelectedBrief(null)
+  }
+
   return (
     <div className="min-h-screen bg-gray-950">
       {/* Navigation */}
       <nav className="border-b border-gray-800 sticky top-0 bg-gray-950/90 backdrop-blur-sm z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-violet-500 rounded-lg flex items-center justify-center">
-                <Brain className="w-5 h-5 text-white" />
+            <Link to="/" className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-primary-500 to-violet-500 rounded-xl flex items-center justify-center">
+                <Brain className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-white">IntelliBrief</span>
+              <div>
+                <span className="text-xl font-bold text-white">IntelliBrief</span>
+                <div className="text-xs text-primary-400 font-medium">Powered by Groq AI</div>
+              </div>
             </Link>
             <div className="flex items-center gap-4">
               {showForm ? (
@@ -109,7 +121,7 @@ export function App() {
               ) : (
                 <button
                   onClick={handleShowForm}
-                  className="flex items-center gap-2 bg-gradient-to-r from-primary-600 to-violet-600 hover:from-primary-500 hover:to-violet-500 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200"
+                  className="flex items-center gap-2 bg-gradient-to-r from-primary-600 to-violet-600 hover:from-primary-500 hover:to-violet-500 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-primary-500/25"
                 >
                   <Plus className="w-4 h-4" />
                   New Brief
@@ -130,9 +142,19 @@ export function App() {
               exit={{ opacity: 0, y: -20 }}
             >
               {error && (
-                <div className="mb-6 p-4 bg-red-500/20 border border-red-500/30 rounded-lg text-red-300">
-                  {error}
-                </div>
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-6 p-4 bg-red-500/20 border border-red-500/30 rounded-xl text-red-300 flex items-center gap-3"
+                >
+                  <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-white text-xs font-bold">!</span>
+                  </div>
+                  <div>
+                    <div className="font-medium">Error creating brief</div>
+                    <div className="text-sm text-red-400">{error}</div>
+                  </div>
+                </motion.div>
               )}
               <BriefForm onSubmit={handleCreateBrief} isLoading={isLoading} />
             </motion.div>
@@ -145,9 +167,20 @@ export function App() {
             >
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h1 className="text-3xl font-bold text-white mb-2">Your Strategic Briefs</h1>
-                  <p className="text-gray-400">
-                    {briefs.length === 0 ? 'No briefs created yet' : `${briefs.length} brief${briefs.length !== 1 ? 's' : ''} generated`}
+                  <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
+                    Your Strategic Briefs
+                    {briefs.length > 0 && (
+                      <span className="inline-flex items-center gap-1 bg-primary-500/20 text-primary-300 px-3 py-1 rounded-full text-sm font-medium">
+                        <Sparkles className="w-4 h-4" />
+                        {briefs.length} generated
+                      </span>
+                    )}
+                  </h1>
+                  <p className="text-gray-400 text-lg">
+                    {briefs.length === 0 
+                      ? 'Create your first AI-powered strategic brief' 
+                      : 'AI-powered insights for smarter B2B outreach'
+                    }
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-gray-400">
@@ -161,7 +194,11 @@ export function App() {
               ) : (
                 <div className="grid gap-6">
                   {briefs.map((brief) => (
-                    <BriefCard key={brief.id} brief={brief} />
+                    <BriefCard 
+                      key={brief.id} 
+                      brief={brief} 
+                      onViewDetails={handleViewBrief}
+                    />
                   ))}
                 </div>
               )}
@@ -169,6 +206,13 @@ export function App() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Brief Modal */}
+      <BriefModal
+        brief={selectedBrief}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+      />
 
       {/* Analyzing Screen Overlay */}
       <AnimatePresence>
