@@ -1,6 +1,6 @@
 
 import { motion } from 'framer-motion'
-import { ExternalLink, TrendingUp } from 'lucide-react'
+import { ExternalLink, TrendingUp, Clock } from 'lucide-react'
 import { NewsItem } from '../lib/supabase'
 
 interface NewsCardProps {

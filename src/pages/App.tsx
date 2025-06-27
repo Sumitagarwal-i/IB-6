@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Brain, Plus, History, ArrowLeft, Sparkles } from 'lucide-react'
@@ -204,8 +203,7 @@ export function App() {
                   {briefs.map((brief) => (
                     <BriefCard 
                       key={brief.id} 
-                      brief={brief} 
-                      onViewDetails={handleViewBrief}
+                      brief={brief}
                     />
                   ))}
                 </div>

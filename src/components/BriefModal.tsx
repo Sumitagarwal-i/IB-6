@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   X, 
@@ -25,7 +26,7 @@ interface BriefModalProps {
 }
 
 export function BriefModal({ brief, isOpen, onClose }: BriefModalProps) {
-  const [copiedField, setCopiedField] = React.useState<string | null>(null)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
 
   const copyToClipboard = async (text: string, field: string) => {
     try {

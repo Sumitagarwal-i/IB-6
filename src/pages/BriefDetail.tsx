@@ -36,7 +36,7 @@ export function BriefDetail() {
   const loadBrief = async (briefId: string) => {
     try {
       setLoading(true)
-      const briefData = await briefsService.getBrief(briefId)
+      const briefData = await briefsService.getById(briefId)
       setBrief(briefData)
     } catch (error) {
       console.error('Error loading brief:', error)
