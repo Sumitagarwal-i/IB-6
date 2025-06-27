@@ -29,6 +29,22 @@ export type NewsItem = {
   description: string
   url: string
   publishedAt: string
+  source: string
+  sourceFavicon?: string
+}
+
+export type JobSignal = {
+  title: string
+  company: string
+  location: string
+  postedDate: string
+  description: string
+}
+
+export type TechStackItem = {
+  name: string
+  confidence: 'High' | 'Medium' | 'Low'
+  source: string
 }
 
 export type CreateBriefRequest = {
