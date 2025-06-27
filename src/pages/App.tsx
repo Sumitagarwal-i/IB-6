@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Brain, Plus, History, ArrowLeft, Sparkles } from 'lucide-react'
@@ -89,11 +90,6 @@ export function App() {
   const handleBackToList = () => {
     setShowForm(false)
     setError(null)
-  }
-
-  const handleViewBrief = (brief: Brief) => {
-    setSelectedBrief(brief)
-    setIsModalOpen(true)
   }
 
   const handleCloseModal = () => {
