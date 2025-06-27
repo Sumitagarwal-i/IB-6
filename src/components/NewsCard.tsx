@@ -1,6 +1,6 @@
-import React from 'react'
+
 import { motion } from 'framer-motion'
-import { ExternalLink, Calendar, TrendingUp } from 'lucide-react'
+import { ExternalLink, TrendingUp } from 'lucide-react'
 import { NewsItem } from '../lib/supabase'
 
 interface NewsCardProps {
@@ -81,7 +81,7 @@ export function NewsCard({ news, index }: NewsCardProps) {
               <span className="font-medium text-gray-400">{news.source}</span>
               <span>•</span>
               <div className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
+                <Clock className="w-3 h-3" />
                 <span>{formatNewsDate(news.publishedAt)}</span>
               </div>
             </div>

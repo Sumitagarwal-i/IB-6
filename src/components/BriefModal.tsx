@@ -1,9 +1,7 @@
-import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   X, 
   Building2, 
-  Calendar, 
   Copy, 
   ExternalLink, 
   Newspaper, 

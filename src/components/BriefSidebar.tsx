@@ -121,7 +121,7 @@ export function BriefSidebar({ brief }: BriefSidebarProps) {
           {/* Job Signals */}
           <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-center">
             <Users className="w-5 h-5 text-blue-400 mx-auto mb-1" />
-            <div className="text-lg font-bold text-white">{hasJobSignals ? brief.jobSignals.length : 0}</div>
+            <div className="text-lg font-bold text-white">{hasJobSignals ? brief.jobSignals?.length || 0 : 0}</div>
             <div className="text-xs text-blue-300">Job Postings</div>
           </div>
 

@@ -1,6 +1,5 @@
-import React from 'react'
 import { motion } from 'framer-motion'
-import { Users, MapPin, DollarSign, Calendar, TrendingUp, Briefcase } from 'lucide-react'
+import { Users, MapPin, DollarSign, TrendingUp, Briefcase } from 'lucide-react'
 import { JobSignal } from '../lib/supabase'
 
 interface HiringChartProps {

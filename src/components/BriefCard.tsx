@@ -17,10 +17,9 @@ import { Link } from 'react-router-dom'
 
 interface BriefCardProps {
   brief: Brief
-  onViewDetails: (brief: Brief) => void
 }
 
-export function BriefCard({ brief, onViewDetails }: BriefCardProps) {
+export function BriefCard({ brief }: BriefCardProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
   const copyToClipboard = async (text: string, field: string) => {
