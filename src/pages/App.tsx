@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Brain, Plus, History, ArrowLeft, Sparkles } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { BriefForm } from '../components/BriefForm'
 import { AnalyzingScreen } from '../components/AnalyzingScreen'
 import { BriefCard } from '../components/BriefCard'
@@ -10,6 +11,7 @@ import { EmptyState } from '../components/EmptyState'
 import { supabase, Brief, CreateBriefRequest, briefsService } from '../lib/supabase'
 
 export function App() {
+  const navigate = useNavigate()
   const [briefs, setBriefs] = useState<Brief[]>([])
   const [selectedBrief, setSelectedBrief] = useState<Brief | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -56,12 +58,19 @@ export function App() {
 
       const result = await response.json()
       
-      // Wait for analyzing animation to complete
-      setTimeout(() => {
+      // Wait for analyzing animation to complete, then navigate to the new brief
+      setTimeout(async () => {
         setIsAnalyzing(false)
         setCurrentAnalysis(null)
         setShowForm(false)
-        loadBriefs() // Refresh the briefs list
+        
+        // Refresh briefs and navigate to the new brief
+        await loadBriefs()
+        
+        // Navigate to the newly created brief detail page
+        if (result.brief && result.brief.id) {
+          navigate(`/brief/${result.brief.id}`)
+        }
       }, 2000)
 
     } catch (err) {
