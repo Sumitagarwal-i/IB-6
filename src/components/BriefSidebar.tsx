@@ -1,9 +1,7 @@
-import React from 'react'
 import { motion } from 'framer-motion'
 import { 
   Building2, 
   Globe, 
-  Calendar, 
   TrendingUp, 
   Users, 
   Code, 
@@ -195,7 +193,7 @@ export function BriefSidebar({ brief }: BriefSidebarProps) {
       {/* Meta Information */}
       <div className="space-y-3 text-sm border-t border-gray-800 pt-6">
         <div className="flex items-center gap-3 text-gray-400">
-          <Calendar className="w-4 h-4" />
+          <Clock className="w-4 h-4" />
           <span>Generated {formatDate(brief.createdAt)}</span>
         </div>
         

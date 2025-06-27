@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Brain, Plus, History, ArrowLeft, Sparkles } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -8,7 +8,7 @@ import { AnalyzingScreen } from '../components/AnalyzingScreen'
 import { BriefCard } from '../components/BriefCard'
 import { BriefModal } from '../components/BriefModal'
 import { EmptyState } from '../components/EmptyState'
-import { supabase, Brief, CreateBriefRequest, briefsService } from '../lib/supabase'
+import { Brief, CreateBriefRequest, briefsService } from '../lib/supabase'
 
 export function App() {
   const navigate = useNavigate()
@@ -62,7 +62,6 @@ export function App() {
       setTimeout(async () => {
         setIsAnalyzing(false)
         setCurrentAnalysis(null)
-        setShowForm(false)
         
         // Refresh briefs and navigate to the new brief
         await loadBriefs()

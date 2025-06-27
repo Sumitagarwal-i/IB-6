@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Newspaper, Code, TrendingUp, Brain, CheckCircle, Zap, Satellite, Database } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
+import { Search, Newspaper, Code, TrendingUp, Brain, Satellite, Database } from 'lucide-react'
 import { LoadingStepIndicator } from './LoadingStepIndicator'
 
 interface AnalyzingScreenProps {

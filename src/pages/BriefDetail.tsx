@@ -1,29 +1,29 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
   ArrowLeft, 
-  Building2, 
-  Globe, 
-  Calendar, 
   Copy, 
   CheckCircle, 
-  ExternalLink,
   Newspaper,
   Code,
-  TrendingUp,
   Target,
   AlertTriangle,
   Mail,
   Brain,
+  Users,
+  Sparkles,
+  Building2,
+  Globe,
+  Calendar,
+  ExternalLink,
+  TrendingUp,
   Clock,
   Shield,
   Zap,
   BarChart3,
-  Users,
   MapPin,
-  DollarSign,
-  Sparkles
+  DollarSign
 } from 'lucide-react'
 import { Brief, briefsService } from '../lib/supabase'
 import { BriefSidebar } from '../components/BriefSidebar'
