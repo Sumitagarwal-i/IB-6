@@ -22,9 +22,15 @@ import {
   BarChart3,
   Users,
   MapPin,
-  DollarSign
+  DollarSign,
+  Sparkles
 } from 'lucide-react'
 import { Brief, briefsService } from '../lib/supabase'
+import { BriefSidebar } from '../components/BriefSidebar'
+import { NewsCard } from '../components/NewsCard'
+import { TechStackGrid } from '../components/TechStackGrid'
+import { HiringChart } from '../components/HiringChart'
+import { RetryBriefButton } from '../components/RetryBriefButton'
 
 export function BriefDetail() {
   const { id } = useParams<{ id: string }>()
@@ -69,46 +75,29 @@ export function BriefDetail() {
     }
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  const handleRetryBrief = async (briefId: string) => {
+    if (!brief) return
+    
+    // Call the create-brief function again with the same parameters
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-brief`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        companyName: brief.companyName,
+        website: brief.website,
+        userIntent: brief.userIntent
+      }),
     })
-  }
 
-  const formatNewsDate = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffTime = Math.abs(now.getTime() - date.getTime())
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
-    if (diffDays === 1) return '1 day ago'
-    if (diffDays < 7) return `${diffDays} days ago`
-    if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`
-    
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
-
-  const getCompanyLogo = (website?: string) => {
-    if (!website) return null
-    try {
-      const domain = new URL(website).hostname.replace('www.', '')
-      return `https://logo.clearbit.com/${domain}`
-    } catch {
-      return null
+    if (response.ok) {
+      // Reload the brief to get updated data
+      await loadBrief(briefId)
+    } else {
+      throw new Error('Failed to retry brief generation')
     }
-  }
-
-  const getSignalColor = (tag: string) => {
-    const lowerTag = tag.toLowerCase()
-    if (lowerTag.includes('hiring') || lowerTag.includes('talent')) return 'bg-green-500/20 text-green-300 border-green-500/30'
-    if (lowerTag.includes('funding') || lowerTag.includes('series') || lowerTag.includes('raised')) return 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-    if (lowerTag.includes('growth') || lowerTag.includes('scaling')) return 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-    if (lowerTag.includes('launch') || lowerTag.includes('product')) return 'bg-orange-500/20 text-orange-300 border-orange-500/30'
-    return 'bg-primary-500/20 text-primary-300 border-primary-500/30'
   }
 
   if (loading) {
@@ -145,8 +134,6 @@ export function BriefDetail() {
     )
   }
 
-  const logoUrl = getCompanyLogo(brief.website)
-
   return (
     <div className="min-h-screen bg-gray-950">
       {/* Navigation */}
@@ -157,116 +144,28 @@ export function BriefDetail() {
               <ArrowLeft className="w-5 h-5" />
               <span className="font-medium">Back to Briefs</span>
             </Link>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-violet-500 rounded-lg flex items-center justify-center">
-                <Brain className="w-5 h-5 text-white" />
+            <div className="flex items-center gap-4">
+              <RetryBriefButton briefId={brief.id} onRetry={handleRetryBrief} />
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-violet-500 rounded-lg flex items-center justify-center">
+                  <Brain className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-lg font-bold text-white">IntelliBrief</span>
               </div>
-              <span className="text-lg font-bold text-white">IntelliBrief</span>
             </div>
           </div>
         </div>
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Left Sidebar - Company Info */}
+        <div className="grid lg:grid-cols-4 gap-8">
+          {/* Left Sidebar */}
           <div className="lg:col-span-1">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-6 sticky top-24"
-            >
-              {/* Company Header */}
-              <div className="text-center mb-6">
-                <div className="relative mx-auto mb-4">
-                  {logoUrl ? (
-                    <img 
-                      src={logoUrl} 
-                      alt={`${brief.companyName} logo`}
-                      className="w-20 h-20 rounded-2xl object-cover bg-gray-800 border border-gray-700 mx-auto"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.style.display = 'none'
-                        target.nextElementSibling?.classList.remove('hidden')
-                      }}
-                    />
-                  ) : null}
-                  <div className={`w-20 h-20 bg-gradient-to-r from-primary-500 to-violet-500 rounded-2xl flex items-center justify-center mx-auto ${logoUrl ? 'hidden' : ''}`}>
-                    <Building2 className="w-10 h-10 text-white" />
-                  </div>
-                </div>
-                
-                <h1 className="text-2xl font-bold text-white mb-2">{brief.companyName}</h1>
-                
-                {brief.website && (
-                  <a 
-                    href={brief.website} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-primary-400 hover:text-primary-300 flex items-center justify-center gap-2 transition-colors"
-                  >
-                    <Globe className="w-4 h-4" />
-                    {new URL(brief.website).hostname.replace('www.', '')}
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                )}
-              </div>
-
-              {/* Signal Tag */}
-              <div className="mb-6">
-                <span className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-full border w-full justify-center ${getSignalColor(brief.signalTag)}`}>
-                  <TrendingUp className="w-4 h-4 mr-2" />
-                  {brief.signalTag}
-                </span>
-              </div>
-
-              {/* Meta Information */}
-              <div className="space-y-4 text-sm">
-                <div className="flex items-center gap-3 text-gray-400">
-                  <Calendar className="w-4 h-4" />
-                  <span>Generated {formatDate(brief.createdAt)}</span>
-                </div>
-                
-                <div className="flex items-center gap-3 text-gray-400">
-                  <BarChart3 className="w-4 h-4" />
-                  <span>{brief.news?.length || 0} news sources analyzed</span>
-                </div>
-                
-                <div className="flex items-center gap-3 text-gray-400">
-                  <Code className="w-4 h-4" />
-                  <span>{brief.techStack?.length || 0} technologies detected</span>
-                </div>
-              </div>
-
-              {/* Quick Actions */}
-              <div className="mt-6 space-y-3">
-                <button
-                  onClick={() => copyToClipboard(brief.pitchAngle, 'pitch')}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white rounded-lg transition-all duration-200 font-medium shadow-lg hover:shadow-violet-500/25"
-                >
-                  {copiedField === 'pitch' ? (
-                    <><CheckCircle className="w-4 h-4" /> Copied Pitch!</>
-                  ) : (
-                    <><Copy className="w-4 h-4" /> Copy Full Pitch</>
-                  )}
-                </button>
-                
-                <button
-                  onClick={() => copyToClipboard(brief.subjectLine, 'subject')}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-accent-600 hover:bg-accent-500 text-white rounded-lg transition-colors font-medium"
-                >
-                  {copiedField === 'subject' ? (
-                    <><CheckCircle className="w-4 h-4" /> Copied!</>
-                  ) : (
-                    <><Mail className="w-4 h-4" /> Copy Subject Line</>
-                  )}
-                </button>
-              </div>
-            </motion.div>
+            <BriefSidebar brief={brief} />
           </div>
 
-          {/* Right Panel - Strategic Content */}
-          <div className="lg:col-span-2">
+          {/* Main Content */}
+          <div className="lg:col-span-3">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -275,20 +174,20 @@ export function BriefDetail() {
               {/* Executive Summary */}
               <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8">
                 <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-                  <Zap className="w-6 h-6 text-primary-400" />
-                  Strategic Intelligence Summary
+                  <Sparkles className="w-6 h-6 text-primary-400" />
+                  Executive Intelligence Summary
                 </h2>
                 <div className="bg-gradient-to-r from-primary-500/10 to-violet-500/10 border border-primary-500/20 rounded-xl p-6">
                   <p className="text-gray-300 leading-relaxed text-lg">{brief.summary}</p>
                 </div>
               </div>
 
-              {/* Personalized Pitch Strategy */}
+              {/* Strategic Pitch Angle */}
               <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold text-white flex items-center gap-3">
                     <Target className="w-6 h-6 text-violet-400" />
-                    Personalized Pitch Strategy
+                    Strategic Pitch Strategy
                   </h2>
                   <button
                     onClick={() => copyToClipboard(brief.pitchAngle, 'pitch-full')}
@@ -311,7 +210,7 @@ export function BriefDetail() {
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold text-white flex items-center gap-3">
                     <Mail className="w-6 h-6 text-accent-400" />
-                    Ready-to-Use Subject Line
+                    Optimized Subject Line
                   </h2>
                   <button
                     onClick={() => copyToClipboard(brief.subjectLine, 'subject-full')}
@@ -330,7 +229,7 @@ export function BriefDetail() {
               </div>
 
               {/* Intelligence Grid */}
-              <div className="grid md:grid-cols-2 gap-8">
+              <div className="grid lg:grid-cols-2 gap-8">
                 {/* Live News Intelligence */}
                 {brief.news && brief.news.length > 0 && (
                   <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8">
@@ -341,76 +240,45 @@ export function BriefDetail() {
                         {brief.news.length} sources
                       </span>
                     </h3>
-                    <div className="space-y-4">
-                      {brief.news.slice(0, 5).map((item, index) => (
-                        <div key={index} className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 hover:border-gray-600 transition-colors">
-                          <div className="flex items-start gap-3">
-                            {item.sourceFavicon && (
-                              <img 
-                                src={item.sourceFavicon} 
-                                alt={`${item.source} favicon`}
-                                className="w-5 h-5 rounded mt-0.5 flex-shrink-0"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement
-                                  target.style.display = 'none'
-                                }}
-                              />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-white mb-2 line-clamp-2 leading-snug">{item.title}</h4>
-                              <p className="text-gray-400 text-sm mb-3 line-clamp-2">{item.description}</p>
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-xs text-gray-500">
-                                  <span className="font-medium">{item.source}</span>
-                                  <span>•</span>
-                                  <span>{formatNewsDate(item.publishedAt)}</span>
-                                </div>
-                                <a 
-                                  href={item.url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-green-400 hover:text-green-300 text-xs flex items-center gap-1 font-medium transition-colors"
-                                >
-                                  Read source <ExternalLink className="w-3 h-3" />
-                                </a>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                      {brief.news.map((newsItem, index) => (
+                        <NewsCard key={index} news={newsItem} index={index} />
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Technology Stack Analysis */}
-                {brief.techStack && brief.techStack.length > 0 && (
+                {/* Hiring Intelligence */}
+                {brief.jobSignals && brief.jobSignals.length > 0 && (
                   <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8">
                     <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
-                      <Code className="w-5 h-5 text-blue-400" />
-                      Technology Stack Analysis
+                      <Users className="w-5 h-5 text-blue-400" />
+                      Hiring Intelligence
                       <span className="text-sm bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full">
-                        {brief.techStack.length} detected
+                        {brief.jobSignals.length} positions
                       </span>
                     </h3>
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                      {brief.techStack.map((tech, index) => (
-                        <div 
-                          key={index}
-                          className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-center"
-                        >
-                          <span className="text-blue-300 font-medium text-sm">{tech}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="p-4 bg-gray-800/30 rounded-lg">
-                      <p className="text-xs text-gray-400 flex items-center gap-2">
-                        <Shield className="w-3 h-3" />
-                        Analysis based on BuiltWith API, job postings, and industry patterns
-                      </p>
-                    </div>
+                    <HiringChart jobSignals={brief.jobSignals} />
                   </div>
                 )}
               </div>
+
+              {/* Technology Stack Analysis */}
+              {brief.techStack && brief.techStack.length > 0 && (
+                <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8">
+                  <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
+                    <Code className="w-5 h-5 text-purple-400" />
+                    Technology Stack Analysis
+                    <span className="text-sm bg-purple-500/20 text-purple-300 px-2 py-1 rounded-full">
+                      {brief.techStack.length} detected
+                    </span>
+                  </h3>
+                  <TechStackGrid 
+                    techStack={brief.techStack} 
+                    techStackData={brief.techStackData}
+                  />
+                </div>
+              )}
 
               {/* Strategic Warnings */}
               <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8">

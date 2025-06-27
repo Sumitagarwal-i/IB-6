@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
           const builtWithData = await builtWithResponse.json()
           const results = builtWithData?.Results?.[0]?.Result?.Paths?.[0]?.Technologies || []
           
-          techStackData = results.slice(0, 12).map((tech: any) => ({
+          techStackData = results.slice(0, 15).map((tech: any) => ({
             name: tech.Name,
             confidence: 'High' as const,
             source: 'BuiltWith API',
@@ -109,12 +109,12 @@ Deno.serve(async (req) => {
       try {
         console.log(`Fetching news for ${companyName} from NewsData.io...`)
         const newsResponse = await fetch(
-          `https://newsdata.io/api/1/news?apikey=${newsApiKey}&q="${companyName}"&language=en&size=15&category=business,technology&prioritydomain=top`
+          `https://newsdata.io/api/1/news?apikey=${newsApiKey}&q="${companyName}"&language=en&size=20&category=business,technology&prioritydomain=top`
         )
         
         if (newsResponse.ok) {
           const newsResult = await newsResponse.json()
-          newsData = newsResult.results?.slice(0, 5).map((item: any) => {
+          newsData = newsResult.results?.slice(0, 8).map((item: any) => {
             const sourceUrl = item.source_url || item.link
             let sourceFavicon = ''
             try {
@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
             
             return {
               title: item.title,
-              description: item.description || item.content?.substring(0, 200) + '...' || '',
+              description: item.description || item.content?.substring(0, 250) + '...' || '',
               url: item.link,
               publishedAt: item.pubDate,
               source: item.source_id || 'News Source',
@@ -159,12 +159,12 @@ Deno.serve(async (req) => {
         
         if (jobResponse.ok) {
           const jobResult = await jobResponse.json()
-          jobSignals = jobResult.data?.slice(0, 10).map((job: any) => ({
+          jobSignals = jobResult.data?.slice(0, 15).map((job: any) => ({
             title: job.job_title,
             company: job.employer_name,
             location: `${job.job_city || 'Remote'}, ${job.job_country || 'Global'}`,
             postedDate: job.job_posted_at_datetime_utc,
-            description: job.job_description?.substring(0, 400) + '...' || '',
+            description: job.job_description?.substring(0, 500) + '...' || '',
             salary: job.job_salary_period && job.job_min_salary 
               ? `${job.job_salary_currency || '$'}${job.job_min_salary}${job.job_max_salary ? '-' + job.job_max_salary : ''} ${job.job_salary_period}`
               : undefined
@@ -199,15 +199,15 @@ Deno.serve(async (req) => {
         
         // Create comprehensive context
         const newsContext = newsData.length > 0 
-          ? newsData.map(n => `• "${n.title}" (${n.source}, ${formatRelativeDate(n.publishedAt)})`).join('\n')
+          ? newsData.map(n => `• "${n.title}" (${n.source}, ${formatRelativeDate(n.publishedAt)}) - ${n.description.substring(0, 150)}...`).join('\n')
           : 'No recent news coverage found in business/tech media'
         
         const jobContext = jobSignals.length > 0
-          ? jobSignals.map(j => `• ${j.title} - ${j.location} (Posted: ${formatRelativeDate(j.postedDate)})${j.salary ? ` - ${j.salary}` : ''}`).join('\n')
+          ? jobSignals.map(j => `• ${j.title} - ${j.location} (Posted: ${formatRelativeDate(j.postedDate)})${j.salary ? ` - ${j.salary}` : ''}\n  Description: ${j.description.substring(0, 200)}...`).join('\n')
           : 'No recent job postings detected'
 
         const techContext = techStackData.length > 0
-          ? techStackData.map(t => `• ${t.name} (${t.confidence} confidence, ${t.category})`).join('\n')
+          ? techStackData.map(t => `• ${t.name} (${t.confidence} confidence, ${t.category}${t.source === 'BuiltWith API' ? ', verified by BuiltWith' : ''})`).join('\n')
           : 'Technology stack not detected'
 
         const hiringTrends = extractHiringTrends(jobSignals)
@@ -221,60 +221,56 @@ DOMAIN: ${companyDomain || 'Not provided'}
 WEBSITE: ${website || 'Not provided'}
 USER INTENT: ${userIntent}
 
-=== REAL-TIME INTELLIGENCE ===
+=== REAL-TIME INTELLIGENCE DATA ===
 
-RECENT NEWS COVERAGE:
+RECENT NEWS COVERAGE (${newsData.length} articles):
 ${newsContext}
 
-CURRENT HIRING ACTIVITY:
+CURRENT HIRING ACTIVITY (${jobSignals.length} positions):
 ${jobContext}
 
-TECHNOLOGY INFRASTRUCTURE:
+TECHNOLOGY INFRASTRUCTURE (${techStackData.length} technologies):
 ${techContext}
 
-HIRING TRENDS DETECTED:
+HIRING TRENDS ANALYSIS:
 ${hiringTrends}
 
-NEWS SENTIMENT ANALYSIS:
+NEWS SENTIMENT & TRENDS:
 ${newsTrends}
 
 === STRATEGIC ANALYSIS REQUIREMENTS ===
 
-Generate a production-grade B2B strategic brief that demonstrates deep market intelligence:
+You are a world-class B2B strategist and market intelligence analyst. Generate a production-grade strategic brief that demonstrates deep market intelligence and insider knowledge. Each section must contain detailed, paragraph-level insights that sound like they come from an expert industry analyst who has been following this company closely.
 
-1. EXECUTIVE SUMMARY: 2-3 sentences that synthesize the most compelling "why now" opportunity based on actual signals (hiring spikes, news events, tech adoption, market timing)
+CRITICAL REQUIREMENTS:
+- Reference specific, recent company activities from the intelligence data
+- Use concrete timing signals and recent developments
+- Demonstrate strategic thinking beyond generic business advice
+- Sound like insights from a seasoned industry expert
+- Each section should be substantial (multiple sentences, not bullet points)
 
-2. PITCH ANGLE: A sophisticated, insider-knowledge pitch strategy that:
-   - References specific, recent company activities
-   - Connects user's offering to detected business needs
-   - Uses timing-based urgency from real signals
+Generate the following sections:
+
+1. EXECUTIVE SUMMARY (3-4 sentences): Synthesize the most compelling "why now" opportunity based on actual signals from news, hiring, and tech adoption. Focus on timing and market positioning.
+
+2. STRATEGIC PITCH ANGLE (2-3 paragraphs): A sophisticated pitch strategy that:
+   - References specific recent company activities and signals
+   - Connects the user's offering to detected business needs and growth patterns
+   - Uses timing-based urgency from real intelligence data
+   - Demonstrates insider knowledge of their current challenges/opportunities
    - Avoids generic business language
 
-3. SUBJECT LINE: A compelling, personalized subject line that feels like insider knowledge
+3. SUBJECT LINE: A compelling, personalized subject line that feels like insider knowledge and references recent company developments
 
-4. STRATEGIC WARNINGS: Specific "what NOT to pitch" guidance based on:
-   - Company stage indicators
-   - Recent news sentiment
-   - Hiring patterns
-   - Industry context
+4. STRATEGIC WARNINGS (1-2 paragraphs): Specific "what NOT to pitch" guidance based on:
+   - Company stage indicators from hiring and news
+   - Recent developments that suggest certain approaches would fail
+   - Industry context and competitive positioning
+   - Timing considerations
 
-5. SIGNAL TAG: A precise descriptor of current company state (e.g., "Scaling AI Team Post-Series B", "Hiring DevOps for Cloud Migration", "Expanding European Operations")
+5. SIGNAL TAG: A precise, descriptive tag of current company state (e.g., "Scaling AI Team Post-Series B", "Hiring DevOps for Cloud Migration", "Expanding European Operations")
 
-=== OUTPUT REQUIREMENTS ===
-- Reference specific data points from the intelligence gathered
-- Use concrete timing signals and recent activities
-- Demonstrate strategic thinking, not generic advice
-- Sound like insights from an expert industry analyst
-- Return ONLY valid JSON format
-
-JSON FORMAT:
-{
-  "summary": "Strategic summary with specific why-now insights",
-  "pitchAngle": "Sophisticated pitch strategy with insider knowledge",
-  "subjectLine": "Compelling, personalized subject line",
-  "whatNotToPitch": "Specific strategic warnings based on company context",
-  "signalTag": "Precise company state descriptor"
-}
+Return ONLY valid JSON format with these exact keys: summary, pitchAngle, subjectLine, whatNotToPitch, signalTag
 `
 
         const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -288,7 +284,7 @@ JSON FORMAT:
             messages: [
               {
                 role: 'system',
-                content: 'You are a world-class B2B strategist and market intelligence analyst. You create sophisticated, data-driven outreach strategies that demonstrate deep industry knowledge. Always reference specific signals and avoid generic business language. Return only valid JSON.'
+                content: 'You are a world-class B2B strategist and market intelligence analyst. You create sophisticated, data-driven outreach strategies that demonstrate deep industry knowledge. Always reference specific signals and avoid generic business language. Return only valid JSON with the exact keys requested.'
               },
               {
                 role: 'user',
@@ -296,7 +292,7 @@ JSON FORMAT:
               }
             ],
             temperature: 0.8,
-            max_tokens: 1500
+            max_tokens: 2000
           })
         })
 
@@ -314,6 +310,7 @@ JSON FORMAT:
               }
             } catch (e) {
               console.log('Failed to parse AI response as JSON:', e)
+              console.log('Raw AI response:', content)
             }
           }
         }
@@ -335,7 +332,18 @@ JSON FORMAT:
         pitchAngle: aiAnalysis.pitchAngle,
         subjectLine: aiAnalysis.subjectLine,
         whatNotToPitch: aiAnalysis.whatNotToPitch,
-        signalTag: aiAnalysis.signalTag
+        signalTag: aiAnalysis.signalTag,
+        jobSignals: jobSignals,
+        techStackData: techStackData,
+        intelligenceSources: {
+          news: newsData.length,
+          jobs: jobSignals.length,
+          technologies: techStackData.length,
+          builtWithUsed: techStackData.some(t => t.source === 'BuiltWith API')
+        },
+        companyLogo,
+        hiringTrends,
+        newsTrends
       })
       .select()
       .single()
@@ -348,23 +356,12 @@ JSON FORMAT:
       )
     }
 
-    console.log(`Successfully created brief for ${companyName}`)
+    console.log(`Successfully created comprehensive brief for ${companyName}`)
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        brief: {
-          ...data,
-          jobSignals,
-          techStackData,
-          companyLogo,
-          intelligenceSources: {
-            news: newsData.length,
-            jobs: jobSignals.length,
-            technologies: techStackData.length,
-            builtWithUsed: techStackData.some(t => t.source === 'BuiltWith API')
-          }
-        }
+        brief: data
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
@@ -478,7 +475,7 @@ function analyzeTechStackFallback(companyName: string, website?: string, jobSign
     }
   }
   
-  return technologies.slice(0, 10)
+  return technologies.slice(0, 12)
 }
 
 function extractHiringTrends(jobSignals: JobSignal[]): string {

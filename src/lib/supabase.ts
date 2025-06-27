@@ -22,6 +22,12 @@ export type Brief = {
   whatNotToPitch: string
   signalTag: string
   createdAt: string
+  jobSignals?: JobSignal[]
+  techStackData?: TechStackItem[]
+  intelligenceSources?: IntelligenceSources
+  companyLogo?: string
+  hiringTrends?: string
+  newsTrends?: string
 }
 
 export type NewsItem = {
@@ -39,12 +45,22 @@ export type JobSignal = {
   location: string
   postedDate: string
   description: string
+  salary?: string
 }
 
 export type TechStackItem = {
   name: string
   confidence: 'High' | 'Medium' | 'Low'
   source: string
+  category: string
+  firstDetected?: string
+}
+
+export type IntelligenceSources = {
+  news: number
+  jobs: number
+  technologies: number
+  builtWithUsed: boolean
 }
 
 export type CreateBriefRequest = {
@@ -65,6 +81,20 @@ export const briefsService = {
     return data || []
   },
 
+  async getById(id: string): Promise<Brief | null> {
+    const { data, error } = await supabase
+      .from('briefs')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null // Not found
+      throw error
+    }
+    return data
+  },
+
   async create(brief: Omit<Brief, 'id' | 'createdAt'>): Promise<Brief> {
     const { data, error } = await supabase
       .from('briefs')
@@ -78,12 +108,39 @@ export const briefsService = {
         pitchAngle: brief.pitchAngle,
         subjectLine: brief.subjectLine,
         whatNotToPitch: brief.whatNotToPitch,
-        signalTag: brief.signalTag
+        signalTag: brief.signalTag,
+        jobSignals: brief.jobSignals,
+        techStackData: brief.techStackData,
+        intelligenceSources: brief.intelligenceSources,
+        companyLogo: brief.companyLogo,
+        hiringTrends: brief.hiringTrends,
+        newsTrends: brief.newsTrends
       })
       .select()
       .single()
 
     if (error) throw error
     return data
+  },
+
+  async update(id: string, updates: Partial<Brief>): Promise<Brief> {
+    const { data, error } = await supabase
+      .from('briefs')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('briefs')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
   }
 }
