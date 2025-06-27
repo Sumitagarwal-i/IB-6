@@ -25,6 +25,15 @@ interface JobSignal {
   location: string
   postedDate: string
   description: string
+  salary?: string
+}
+
+interface TechStackItem {
+  name: string
+  confidence: 'High' | 'Medium' | 'Low'
+  source: string
+  category: string
+  firstDetected?: string
 }
 
 Deno.serve(async (req) => {
@@ -49,11 +58,11 @@ Deno.serve(async (req) => {
       )
     }
 
-    console.log(`Creating enhanced brief for ${companyName}...`)
+    console.log(`Creating production-grade brief for ${companyName}...`)
 
-    // 1. Fetch company logo/metadata from Clearbit
-    let companyLogo = ''
+    // 1. Extract domain and setup Clearbit
     let companyDomain = ''
+    let companyLogo = ''
     if (website) {
       try {
         const url = new URL(website)
@@ -64,37 +73,82 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2. Fetch real news from NewsData.io with enhanced data
+    // 2. Fetch real tech stack from BuiltWith API
+    let techStackData: TechStackItem[] = []
+    const builtWithApiKey = Deno.env.get('BUILTWITH_API_KEY')
+    if (builtWithApiKey && companyDomain) {
+      try {
+        console.log(`Fetching tech stack for ${companyDomain} from BuiltWith...`)
+        const builtWithResponse = await fetch(
+          `https://api.builtwith.com/v21/api.json?KEY=${builtWithApiKey}&LOOKUP=${companyDomain}`
+        )
+        
+        if (builtWithResponse.ok) {
+          const builtWithData = await builtWithResponse.json()
+          const results = builtWithData?.Results?.[0]?.Result?.Paths?.[0]?.Technologies || []
+          
+          techStackData = results.slice(0, 12).map((tech: any) => ({
+            name: tech.Name,
+            confidence: 'High' as const,
+            source: 'BuiltWith API',
+            category: tech.Categories?.[0]?.Name || 'Other',
+            firstDetected: tech.FirstDetected ? formatDate(tech.FirstDetected) : undefined
+          }))
+          
+          console.log(`Found ${techStackData.length} technologies from BuiltWith`)
+        }
+      } catch (e) {
+        console.log('BuiltWith API failed, using fallback analysis:', e)
+      }
+    }
+
+    // 3. Fetch enhanced news from NewsData.io
     let newsData: NewsItem[] = []
     const newsApiKey = Deno.env.get('NEWSDATA_API_KEY')
     if (newsApiKey) {
       try {
+        console.log(`Fetching news for ${companyName} from NewsData.io...`)
         const newsResponse = await fetch(
-          `https://newsdata.io/api/1/news?apikey=${newsApiKey}&q="${companyName}"&language=en&size=10&category=business,technology`
+          `https://newsdata.io/api/1/news?apikey=${newsApiKey}&q="${companyName}"&language=en&size=15&category=business,technology&prioritydomain=top`
         )
+        
         if (newsResponse.ok) {
           const newsResult = await newsResponse.json()
-          newsData = newsResult.results?.slice(0, 4).map((item: any) => ({
-            title: item.title,
-            description: item.description || item.content?.substring(0, 200) + '...' || '',
-            url: item.link,
-            publishedAt: item.pubDate,
-            source: item.source_id || 'Unknown Source',
-            sourceFavicon: item.source_icon || `https://www.google.com/s2/favicons?domain=${new URL(item.link).hostname}&sz=32`
-          })) || []
+          newsData = newsResult.results?.slice(0, 5).map((item: any) => {
+            const sourceUrl = item.source_url || item.link
+            let sourceFavicon = ''
+            try {
+              const domain = new URL(sourceUrl).hostname
+              sourceFavicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
+            } catch (e) {
+              sourceFavicon = 'https://www.google.com/s2/favicons?domain=news.com&sz=32'
+            }
+            
+            return {
+              title: item.title,
+              description: item.description || item.content?.substring(0, 200) + '...' || '',
+              url: item.link,
+              publishedAt: item.pubDate,
+              source: item.source_id || 'News Source',
+              sourceFavicon
+            }
+          }) || []
+          
+          console.log(`Found ${newsData.length} news articles`)
         }
       } catch (e) {
         console.log('Failed to fetch news:', e)
       }
     }
 
-    // 3. Fetch detailed job signals from JSearch
+    // 4. Fetch detailed hiring signals from JSearch
     let jobSignals: JobSignal[] = []
     const jsearchApiKey = Deno.env.get('JSEARCH_API_KEY')
     if (jsearchApiKey) {
       try {
+        console.log(`Fetching job signals for ${companyName} from JSearch...`)
         const jobResponse = await fetch(
-          `https://jsearch.p.rapidapi.com/search?query=${encodeURIComponent(companyName + ' jobs')}&page=1&num_pages=1&date_posted=month`,
+          `https://jsearch.p.rapidapi.com/search?query=${encodeURIComponent(companyName + ' jobs')}&page=1&num_pages=1&date_posted=month&employment_types=FULLTIME`,
           {
             headers: {
               'X-RapidAPI-Key': jsearchApiKey,
@@ -102,88 +156,125 @@ Deno.serve(async (req) => {
             }
           }
         )
+        
         if (jobResponse.ok) {
           const jobResult = await jobResponse.json()
-          jobSignals = jobResult.data?.slice(0, 8).map((job: any) => ({
+          jobSignals = jobResult.data?.slice(0, 10).map((job: any) => ({
             title: job.job_title,
             company: job.employer_name,
-            location: job.job_city + ', ' + job.job_country,
+            location: `${job.job_city || 'Remote'}, ${job.job_country || 'Global'}`,
             postedDate: job.job_posted_at_datetime_utc,
-            description: job.job_description?.substring(0, 300) + '...' || ''
+            description: job.job_description?.substring(0, 400) + '...' || '',
+            salary: job.job_salary_period && job.job_min_salary 
+              ? `${job.job_salary_currency || '$'}${job.job_min_salary}${job.job_max_salary ? '-' + job.job_max_salary : ''} ${job.job_salary_period}`
+              : undefined
           })) || []
+          
+          console.log(`Found ${jobSignals.length} job postings`)
         }
       } catch (e) {
         console.log('Failed to fetch job signals:', e)
       }
     }
 
-    // 4. Enhanced tech stack inference with confidence levels
-    const techStackAnalysis = analyzeTechStack(companyName, website, jobSignals, newsData)
+    // 5. Fallback tech stack analysis if BuiltWith failed
+    if (techStackData.length === 0) {
+      console.log('Using fallback tech stack analysis...')
+      techStackData = analyzeTechStackFallback(companyName, website, jobSignals, newsData)
+    }
 
-    // 5. Generate enhanced AI analysis using Groq with real data context
+    // 6. Generate strategic AI analysis using Groq with comprehensive context
     const groqApiKey = Deno.env.get('GROQ_API_KEY')
     let aiAnalysis = {
-      summary: 'Company analysis in progress...',
-      pitchAngle: 'Strategic recommendations being generated...',
-      subjectLine: 'Subject line suggestion pending...',
-      whatNotToPitch: 'Risk analysis in progress...',
-      signalTag: 'Processing signals...'
+      summary: 'Strategic analysis in progress...',
+      pitchAngle: 'Personalized strategy being crafted...',
+      subjectLine: 'Subject line optimization pending...',
+      whatNotToPitch: 'Risk assessment in progress...',
+      signalTag: 'Signal analysis pending...'
     }
 
     if (groqApiKey) {
       try {
-        // Create rich context for Groq
+        console.log('Generating strategic analysis with Groq LLaMA-3...')
+        
+        // Create comprehensive context
         const newsContext = newsData.length > 0 
-          ? newsData.map(n => `"${n.title}" (${n.source}, ${formatDate(n.publishedAt)})`).join('\n')
-          : 'No recent news found'
+          ? newsData.map(n => `• "${n.title}" (${n.source}, ${formatRelativeDate(n.publishedAt)})`).join('\n')
+          : 'No recent news coverage found in business/tech media'
         
         const jobContext = jobSignals.length > 0
-          ? jobSignals.map(j => `${j.title} - ${j.location} (Posted: ${formatDate(j.postedDate)})`).join('\n')
-          : 'No recent job postings found'
+          ? jobSignals.map(j => `• ${j.title} - ${j.location} (Posted: ${formatRelativeDate(j.postedDate)})${j.salary ? ` - ${j.salary}` : ''}`).join('\n')
+          : 'No recent job postings detected'
 
-        const techContext = techStackAnalysis.technologies.length > 0
-          ? techStackAnalysis.technologies.map(t => `${t.name} (${t.confidence})`).join(', ')
-          : 'Tech stack not detected'
+        const techContext = techStackData.length > 0
+          ? techStackData.map(t => `• ${t.name} (${t.confidence} confidence, ${t.category})`).join('\n')
+          : 'Technology stack not detected'
 
-        const prompt = `
-COMPANY ANALYSIS REQUEST:
-Company: ${companyName}
-Website: ${website || 'Not provided'}
-Domain: ${companyDomain || 'Unknown'}
-User Intent: ${userIntent}
+        const hiringTrends = extractHiringTrends(jobSignals)
+        const newsTrends = extractNewsTrends(newsData)
 
-REAL DATA GATHERED:
-Recent News Headlines:
+        const strategicPrompt = `
+STRATEGIC INTELLIGENCE BRIEF REQUEST
+
+COMPANY: ${companyName}
+DOMAIN: ${companyDomain || 'Not provided'}
+WEBSITE: ${website || 'Not provided'}
+USER INTENT: ${userIntent}
+
+=== REAL-TIME INTELLIGENCE ===
+
+RECENT NEWS COVERAGE:
 ${newsContext}
 
-Current Hiring Activity:
+CURRENT HIRING ACTIVITY:
 ${jobContext}
 
-Detected Technology Stack:
+TECHNOLOGY INFRASTRUCTURE:
 ${techContext}
 
-ANALYSIS REQUIREMENTS:
-Generate a strategic B2B outreach brief that is:
-1. Specific to this company's current situation
-2. Based on real signals from news and hiring data
-3. Tailored to the user's intent
-4. Avoids generic business language
+HIRING TRENDS DETECTED:
+${hiringTrends}
 
-OUTPUT FORMAT (JSON):
+NEWS SENTIMENT ANALYSIS:
+${newsTrends}
+
+=== STRATEGIC ANALYSIS REQUIREMENTS ===
+
+Generate a production-grade B2B strategic brief that demonstrates deep market intelligence:
+
+1. EXECUTIVE SUMMARY: 2-3 sentences that synthesize the most compelling "why now" opportunity based on actual signals (hiring spikes, news events, tech adoption, market timing)
+
+2. PITCH ANGLE: A sophisticated, insider-knowledge pitch strategy that:
+   - References specific, recent company activities
+   - Connects user's offering to detected business needs
+   - Uses timing-based urgency from real signals
+   - Avoids generic business language
+
+3. SUBJECT LINE: A compelling, personalized subject line that feels like insider knowledge
+
+4. STRATEGIC WARNINGS: Specific "what NOT to pitch" guidance based on:
+   - Company stage indicators
+   - Recent news sentiment
+   - Hiring patterns
+   - Industry context
+
+5. SIGNAL TAG: A precise descriptor of current company state (e.g., "Scaling AI Team Post-Series B", "Hiring DevOps for Cloud Migration", "Expanding European Operations")
+
+=== OUTPUT REQUIREMENTS ===
+- Reference specific data points from the intelligence gathered
+- Use concrete timing signals and recent activities
+- Demonstrate strategic thinking, not generic advice
+- Sound like insights from an expert industry analyst
+- Return ONLY valid JSON format
+
+JSON FORMAT:
 {
-  "summary": "2-3 sentences with specific 'why now' insight based on real signals",
-  "pitchAngle": "Personalized pitch strategy that references actual company signals and timing",
-  "subjectLine": "Compelling subject line that feels personal and timely",
-  "whatNotToPitch": "Specific warnings based on company stage, recent news, or industry context",
-  "signalTag": "Descriptive tag based on actual hiring/news signals (e.g., 'Scaling AI Team in Europe', 'Post-Series B Growth Mode')"
+  "summary": "Strategic summary with specific why-now insights",
+  "pitchAngle": "Sophisticated pitch strategy with insider knowledge",
+  "subjectLine": "Compelling, personalized subject line",
+  "whatNotToPitch": "Specific strategic warnings based on company context",
+  "signalTag": "Precise company state descriptor"
 }
-
-GUIDELINES:
-- Reference specific news headlines or job roles when relevant
-- Use concrete timing signals (recent funding, new hires, product launches)
-- Avoid phrases like "cutting-edge", "ideal time", "innovative solution"
-- Make the pitch angle feel like insider knowledge
-- Signal tag should reflect actual company activity, not generic labels
 `
 
         const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -197,15 +288,15 @@ GUIDELINES:
             messages: [
               {
                 role: 'system',
-                content: 'You are an expert B2B strategist who creates personalized outreach strategies based on real company signals. Always reference specific data points and avoid generic business language. Return only valid JSON.'
+                content: 'You are a world-class B2B strategist and market intelligence analyst. You create sophisticated, data-driven outreach strategies that demonstrate deep industry knowledge. Always reference specific signals and avoid generic business language. Return only valid JSON.'
               },
               {
                 role: 'user',
-                content: prompt
+                content: strategicPrompt
               }
             ],
-            temperature: 0.7,
-            max_tokens: 1200
+            temperature: 0.8,
+            max_tokens: 1500
           })
         })
 
@@ -214,14 +305,15 @@ GUIDELINES:
           const content = groqResult.choices?.[0]?.message?.content
           if (content) {
             try {
-              // Try to parse JSON from the response
+              // Extract JSON from response
               const jsonMatch = content.match(/\{[\s\S]*\}/)
               if (jsonMatch) {
                 const parsedAnalysis = JSON.parse(jsonMatch[0])
                 aiAnalysis = { ...aiAnalysis, ...parsedAnalysis }
+                console.log('Successfully generated AI strategic analysis')
               }
             } catch (e) {
-              console.log('Failed to parse AI response as JSON, using fallback')
+              console.log('Failed to parse AI response as JSON:', e)
             }
           }
         }
@@ -230,7 +322,7 @@ GUIDELINES:
       }
     }
 
-    // 6. Save to database with enhanced data structure
+    // 7. Save comprehensive brief to database
     const { data, error } = await supabaseClient
       .from('briefs')
       .insert({
@@ -239,7 +331,7 @@ GUIDELINES:
         userIntent,
         summary: aiAnalysis.summary,
         news: newsData,
-        techStack: techStackAnalysis.technologies.map(t => t.name),
+        techStack: techStackData.map(t => t.name),
         pitchAngle: aiAnalysis.pitchAngle,
         subjectLine: aiAnalysis.subjectLine,
         whatNotToPitch: aiAnalysis.whatNotToPitch,
@@ -256,14 +348,22 @@ GUIDELINES:
       )
     }
 
+    console.log(`Successfully created brief for ${companyName}`)
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         brief: {
           ...data,
           jobSignals,
-          techStackAnalysis,
-          companyLogo
+          techStackData,
+          companyLogo,
+          intelligenceSources: {
+            news: newsData.length,
+            jobs: jobSignals.length,
+            technologies: techStackData.length,
+            builtWithUsed: techStackData.some(t => t.source === 'BuiltWith API')
+          }
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -278,90 +378,190 @@ GUIDELINES:
   }
 })
 
-function analyzeTechStack(companyName: string, website?: string, jobSignals: JobSignal[] = [], newsData: NewsItem[] = []) {
-  const technologies: Array<{ name: string; confidence: 'High' | 'Medium' | 'Low'; source: string }> = []
+function analyzeTechStackFallback(companyName: string, website?: string, jobSignals: JobSignal[] = [], newsData: NewsItem[] = []): TechStackItem[] {
+  const technologies: TechStackItem[] = []
   
   // Combine all text for analysis
   const allText = `${companyName} ${website || ''} ${jobSignals.map(j => j.title + ' ' + j.description).join(' ')} ${newsData.map(n => n.title + ' ' + n.description).join(' ')}`.toLowerCase()
   
-  // Enhanced tech detection with confidence levels
+  // Enhanced tech detection patterns
   const techPatterns = {
-    // Frontend
-    'React': { keywords: ['react', 'react.js', 'reactjs'], confidence: 'High' as const },
-    'Vue.js': { keywords: ['vue', 'vue.js', 'vuejs'], confidence: 'High' as const },
-    'Angular': { keywords: ['angular', 'angularjs'], confidence: 'High' as const },
-    'TypeScript': { keywords: ['typescript', 'ts developer'], confidence: 'High' as const },
-    'Next.js': { keywords: ['next.js', 'nextjs'], confidence: 'Medium' as const },
+    // Frontend Frameworks
+    'React': { keywords: ['react', 'react.js', 'reactjs'], category: 'Frontend', confidence: 'High' as const },
+    'Vue.js': { keywords: ['vue', 'vue.js', 'vuejs'], category: 'Frontend', confidence: 'High' as const },
+    'Angular': { keywords: ['angular', 'angularjs'], category: 'Frontend', confidence: 'High' as const },
+    'Next.js': { keywords: ['next.js', 'nextjs'], category: 'Frontend', confidence: 'Medium' as const },
+    'Svelte': { keywords: ['svelte', 'sveltekit'], category: 'Frontend', confidence: 'Medium' as const },
     
-    // Backend
-    'Node.js': { keywords: ['node', 'nodejs', 'node.js'], confidence: 'High' as const },
-    'Python': { keywords: ['python', 'django', 'flask', 'fastapi'], confidence: 'High' as const },
-    'Java': { keywords: ['java', 'spring', 'spring boot'], confidence: 'High' as const },
-    'Go': { keywords: ['golang', 'go developer'], confidence: 'Medium' as const },
-    'Ruby': { keywords: ['ruby', 'rails', 'ruby on rails'], confidence: 'Medium' as const },
+    // Backend Technologies
+    'Node.js': { keywords: ['node', 'nodejs', 'node.js'], category: 'Backend', confidence: 'High' as const },
+    'Python': { keywords: ['python', 'django', 'flask', 'fastapi'], category: 'Backend', confidence: 'High' as const },
+    'Java': { keywords: ['java', 'spring', 'spring boot'], category: 'Backend', confidence: 'High' as const },
+    'Go': { keywords: ['golang', 'go developer'], category: 'Backend', confidence: 'Medium' as const },
+    'Ruby': { keywords: ['ruby', 'rails', 'ruby on rails'], category: 'Backend', confidence: 'Medium' as const },
+    'PHP': { keywords: ['php', 'laravel', 'symfony'], category: 'Backend', confidence: 'Medium' as const },
     
-    // Cloud & Infrastructure
-    'AWS': { keywords: ['aws', 'amazon web services', 'ec2', 's3'], confidence: 'High' as const },
-    'Google Cloud': { keywords: ['gcp', 'google cloud', 'firebase'], confidence: 'High' as const },
-    'Azure': { keywords: ['azure', 'microsoft azure'], confidence: 'High' as const },
-    'Docker': { keywords: ['docker', 'container'], confidence: 'Medium' as const },
-    'Kubernetes': { keywords: ['kubernetes', 'k8s'], confidence: 'Medium' as const },
+    // Cloud Platforms
+    'AWS': { keywords: ['aws', 'amazon web services', 'ec2', 's3', 'lambda'], category: 'Cloud', confidence: 'High' as const },
+    'Google Cloud': { keywords: ['gcp', 'google cloud', 'firebase'], category: 'Cloud', confidence: 'High' as const },
+    'Microsoft Azure': { keywords: ['azure', 'microsoft azure'], category: 'Cloud', confidence: 'High' as const },
+    'Vercel': { keywords: ['vercel'], category: 'Cloud', confidence: 'Medium' as const },
+    'Netlify': { keywords: ['netlify'], category: 'Cloud', confidence: 'Medium' as const },
+    
+    // DevOps & Infrastructure
+    'Docker': { keywords: ['docker', 'container'], category: 'DevOps', confidence: 'High' as const },
+    'Kubernetes': { keywords: ['kubernetes', 'k8s'], category: 'DevOps', confidence: 'High' as const },
+    'Jenkins': { keywords: ['jenkins'], category: 'DevOps', confidence: 'Medium' as const },
+    'GitHub Actions': { keywords: ['github actions'], category: 'DevOps', confidence: 'Medium' as const },
     
     // Databases
-    'PostgreSQL': { keywords: ['postgres', 'postgresql'], confidence: 'High' as const },
-    'MongoDB': { keywords: ['mongo', 'mongodb'], confidence: 'High' as const },
-    'Redis': { keywords: ['redis'], confidence: 'Medium' as const },
-    'MySQL': { keywords: ['mysql'], confidence: 'Medium' as const },
+    'PostgreSQL': { keywords: ['postgres', 'postgresql'], category: 'Database', confidence: 'High' as const },
+    'MongoDB': { keywords: ['mongo', 'mongodb'], category: 'Database', confidence: 'High' as const },
+    'Redis': { keywords: ['redis'], category: 'Database', confidence: 'Medium' as const },
+    'MySQL': { keywords: ['mysql'], category: 'Database', confidence: 'Medium' as const },
+    'Elasticsearch': { keywords: ['elasticsearch', 'elastic'], category: 'Database', confidence: 'Medium' as const },
     
     // AI/ML
-    'TensorFlow': { keywords: ['tensorflow', 'tf'], confidence: 'High' as const },
-    'PyTorch': { keywords: ['pytorch'], confidence: 'High' as const },
-    'OpenAI': { keywords: ['openai', 'gpt', 'chatgpt'], confidence: 'Medium' as const },
+    'TensorFlow': { keywords: ['tensorflow', 'tf'], category: 'AI/ML', confidence: 'High' as const },
+    'PyTorch': { keywords: ['pytorch'], category: 'AI/ML', confidence: 'High' as const },
+    'OpenAI': { keywords: ['openai', 'gpt', 'chatgpt'], category: 'AI/ML', confidence: 'Medium' as const },
+    'Hugging Face': { keywords: ['hugging face', 'transformers'], category: 'AI/ML', confidence: 'Medium' as const },
     
-    // Other
-    'GraphQL': { keywords: ['graphql'], confidence: 'Medium' as const },
-    'Elasticsearch': { keywords: ['elasticsearch', 'elastic'], confidence: 'Medium' as const },
-    'Kafka': { keywords: ['kafka', 'apache kafka'], confidence: 'Medium' as const }
+    // Languages
+    'TypeScript': { keywords: ['typescript', 'ts developer'], category: 'Language', confidence: 'High' as const },
+    'JavaScript': { keywords: ['javascript', 'js developer'], category: 'Language', confidence: 'High' as const },
+    'Rust': { keywords: ['rust', 'rust developer'], category: 'Language', confidence: 'Medium' as const },
+    
+    // Other Tools
+    'GraphQL': { keywords: ['graphql'], category: 'API', confidence: 'Medium' as const },
+    'Apache Kafka': { keywords: ['kafka', 'apache kafka'], category: 'Messaging', confidence: 'Medium' as const },
+    'Stripe': { keywords: ['stripe'], category: 'Payments', confidence: 'Medium' as const }
   }
   
   for (const [tech, pattern] of Object.entries(techPatterns)) {
     const found = pattern.keywords.some(keyword => allText.includes(keyword))
     if (found) {
       const source = jobSignals.some(j => pattern.keywords.some(k => (j.title + ' ' + j.description).toLowerCase().includes(k))) 
-        ? 'Job Posting' 
+        ? 'Job Analysis' 
         : newsData.some(n => pattern.keywords.some(k => (n.title + ' ' + n.description).toLowerCase().includes(k)))
-        ? 'News Article'
+        ? 'News Analysis'
         : 'Company Analysis'
       
       technologies.push({
         name: tech,
         confidence: pattern.confidence,
-        source
+        source,
+        category: pattern.category
       })
     }
   }
   
-  // Add some inferred technologies based on company type
+  // Industry-based inference if no specific tech found
   if (technologies.length === 0) {
     if (allText.includes('ai') || allText.includes('machine learning') || allText.includes('data')) {
-      technologies.push({ name: 'Python', confidence: 'Low', source: 'Industry Inference' })
-      technologies.push({ name: 'AWS', confidence: 'Low', source: 'Industry Inference' })
-    } else if (allText.includes('web') || allText.includes('frontend')) {
-      technologies.push({ name: 'JavaScript', confidence: 'Low', source: 'Industry Inference' })
-      technologies.push({ name: 'React', confidence: 'Low', source: 'Industry Inference' })
+      technologies.push(
+        { name: 'Python', confidence: 'Low', source: 'Industry Inference', category: 'Backend' },
+        { name: 'TensorFlow', confidence: 'Low', source: 'Industry Inference', category: 'AI/ML' },
+        { name: 'AWS', confidence: 'Low', source: 'Industry Inference', category: 'Cloud' }
+      )
+    } else if (allText.includes('web') || allText.includes('frontend') || allText.includes('app')) {
+      technologies.push(
+        { name: 'JavaScript', confidence: 'Low', source: 'Industry Inference', category: 'Language' },
+        { name: 'React', confidence: 'Low', source: 'Industry Inference', category: 'Frontend' },
+        { name: 'Node.js', confidence: 'Low', source: 'Industry Inference', category: 'Backend' }
+      )
     } else {
-      technologies.push({ name: 'Cloud Infrastructure', confidence: 'Low', source: 'Industry Standard' })
-      technologies.push({ name: 'Modern Web Stack', confidence: 'Low', source: 'Industry Standard' })
+      technologies.push(
+        { name: 'Cloud Infrastructure', confidence: 'Low', source: 'Industry Standard', category: 'Cloud' },
+        { name: 'Modern Web Stack', confidence: 'Low', source: 'Industry Standard', category: 'Frontend' }
+      )
     }
   }
   
-  return {
-    technologies: technologies.slice(0, 8), // Limit to 8 technologies
-    analysisDate: new Date().toISOString()
+  return technologies.slice(0, 10)
+}
+
+function extractHiringTrends(jobSignals: JobSignal[]): string {
+  if (jobSignals.length === 0) return 'No hiring activity detected'
+  
+  const roles = jobSignals.map(j => j.title.toLowerCase())
+  const locations = jobSignals.map(j => j.location)
+  
+  // Analyze role patterns
+  const rolePatterns = {
+    'AI/ML': ['ai', 'machine learning', 'data scientist', 'ml engineer'],
+    'Engineering': ['engineer', 'developer', 'architect', 'tech lead'],
+    'DevOps': ['devops', 'sre', 'infrastructure', 'cloud'],
+    'Product': ['product manager', 'product owner', 'pm'],
+    'Sales': ['sales', 'account', 'business development'],
+    'Marketing': ['marketing', 'growth', 'content']
   }
+  
+  const trends = []
+  for (const [category, keywords] of Object.entries(rolePatterns)) {
+    const count = roles.filter(role => keywords.some(keyword => role.includes(keyword))).length
+    if (count > 0) {
+      trends.push(`${count} ${category} roles`)
+    }
+  }
+  
+  // Location analysis
+  const locationCounts = locations.reduce((acc, loc) => {
+    const key = loc.split(',')[1]?.trim() || loc
+    acc[key] = (acc[key] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+  
+  const topLocation = Object.entries(locationCounts).sort(([,a], [,b]) => b - a)[0]
+  
+  return trends.length > 0 
+    ? `Active hiring: ${trends.join(', ')}${topLocation ? ` (primarily ${topLocation[0]})` : ''}`
+    : `${jobSignals.length} open positions across various departments`
+}
+
+function extractNewsTrends(newsData: NewsItem[]): string {
+  if (newsData.length === 0) return 'No recent news coverage'
+  
+  const titles = newsData.map(n => n.title.toLowerCase()).join(' ')
+  
+  const sentimentKeywords = {
+    positive: ['funding', 'raised', 'growth', 'expansion', 'launch', 'partnership', 'acquisition', 'success'],
+    negative: ['layoffs', 'cuts', 'decline', 'loss', 'controversy', 'investigation'],
+    neutral: ['announces', 'reports', 'updates', 'changes']
+  }
+  
+  let sentiment = 'neutral'
+  let maxCount = 0
+  
+  for (const [type, keywords] of Object.entries(sentimentKeywords)) {
+    const count = keywords.filter(keyword => titles.includes(keyword)).length
+    if (count > maxCount) {
+      maxCount = count
+      sentiment = type
+    }
+  }
+  
+  const recentCount = newsData.filter(n => {
+    const daysSince = Math.floor((Date.now() - new Date(n.publishedAt).getTime()) / (1000 * 60 * 60 * 24))
+    return daysSince <= 7
+  }).length
+  
+  return `${newsData.length} recent articles (${recentCount} this week) - ${sentiment} sentiment`
 }
 
 function formatDate(dateString: string): string {
+  try {
+    return new Date(dateString).toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    })
+  } catch {
+    return 'Recently'
+  }
+}
+
+function formatRelativeDate(dateString: string): string {
   try {
     const date = new Date(dateString)
     const now = new Date()

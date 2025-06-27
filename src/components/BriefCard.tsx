@@ -11,9 +11,11 @@ import {
   Newspaper,
   Briefcase,
   TrendingUp,
-  Clock
+  Clock,
+  ArrowRight
 } from 'lucide-react'
 import { Brief } from '../lib/supabase'
+import { Link } from 'react-router-dom'
 
 interface BriefCardProps {
   brief: Brief
@@ -212,13 +214,13 @@ export function BriefCard({ brief, onViewDetails }: BriefCardProps) {
               <><Copy className="w-4 h-4" /> Copy Pitch</>
             )}
           </button>
-          <button
-            onClick={() => onViewDetails(brief)}
+          <Link
+            to={`/brief/${brief.id}`}
             className="flex items-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-600 text-gray-300 hover:text-white rounded-lg transition-all duration-200 font-medium text-sm"
           >
-            <Eye className="w-4 h-4" />
+            <ArrowRight className="w-4 h-4" />
             Full Brief
-          </button>
+          </Link>
         </div>
       </div>
     </motion.div>
